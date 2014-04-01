@@ -14,6 +14,7 @@
 #include "io_packet.h"
 #include "action_packet.h"
 
+
 #if defined(__AVR_ATmega328P__)
 #include <SoftwareSerial.h>
 #endif
@@ -22,6 +23,7 @@
 #define SERIAL2 1
 #define SERIAL3 2
 #define SERIAL4 3
+#define KV 0.325*PI/(0.0112*180)
 
 #define TIME_OUT 1000
 
@@ -31,6 +33,7 @@ private:
   char servo_id;
 	char serialPort;
 	Packet *ack, *packet;
+	char torque_status;
 
 #if defined (__AVR_ATmega328P__)
 	SoftwareSerial mySerial;
@@ -47,28 +50,36 @@ public:
 
 	
 	//Direct servo commands
-	void read_mem(char mem, char servo_id, char reg_addr, unsigned char data_length);
+	bool read_mem(char mem, char servo_id, char reg_addr, unsigned char data_length);
 	void write_mem(char mem, char servo_id, char reg_addr, unsigned char data_length, char *data);
 	void iJog();
-	void sJog(char size, char servo_id, uint16_t data, char stop, char mode, char led, char play_time);
+	void sJog(char size, char servo_id, uint16_t data, char stop, char mode, char led, char ptime);
 	bool stat();
 	void rollback();
 	void reboot();
 	
 	//Indirect commands
-	void setTorque(char servo_id, uint16_t pwm);
 	void init();
 	void configAckPolicy(char servo_id, char policy);
 	void configLedPolicy(char servo_id, char policy);
 	void ledControl(char servo_id, char led);
 	void clear();
-	void configLedPolicy(char policy);
-	void moveCont(uint16_t velocity);
 	void setTorqueControl(char servo_id, char control);
-	
-	void ledControl(char led);
-	void setMode(char mode, char led);
 	bool scanServo();
+
+	/** Control Interface
+	 *
+	 * Functions for feedback, the 1st read the current absolute
+	 * position, the second read the angular velocity. The outputs
+	 * are converted to degrees and rad/s respectively
+	 */
+	float readPosition();
+	float readVelocity();
+	//set input toque to servo
+	void setTorque(int16_t pwm);
+
+	
+
 	
 	//setters and getters
 	uint8_t getPort();

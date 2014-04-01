@@ -7,6 +7,7 @@ Herkulex::Herkulex() {
 	packet=NULL;
 	serialPort=SERIAL1;
 	servo_id=253;
+	torque_status=0;
 #ifdef __AVR_ATmega328P__
 	mySerial(10, 11); // RX, TX
 #endif
@@ -15,6 +16,7 @@ Herkulex::Herkulex() {
 Herkulex::Herkulex(char servo_id, char port) {
 	ack=NULL;
 	packet=NULL;
+	torque_status=0;
 	this->servo_id=servo_id;
 	serialPort=port;
 }
@@ -70,9 +72,9 @@ void Herkulex::end() {
 void Herkulex::init() {
 	clear();
 	delay(12);
-	printf("Servo cleared\n");
+//	printf("Servo cleared\n");
 	reboot();
-	printf("Servo rebooted\n");
+//	printf("Servo rebooted\n");
 	delay(1000);
 
 	char *data = (char*)malloc(2*sizeof(char));
@@ -120,7 +122,7 @@ void Herkulex::init() {
 //	printf("PWM Overload ok\n");
 	
 	setTorqueControl(servo_id,TORQUE_ON);//torque on
-	printf("Torque On Ok\n");
+//	printf("Torque On Ok\n");
 /*
 	//this->flush();
 	setTorque(servo_id,704);
@@ -156,7 +158,7 @@ void Herkulex::write_mem(char mem, char servo_id, char reg_addr, unsigned char d
 	send();
 }
 
-void Herkulex::read_mem(char mem, char servo_id, char reg_addr, unsigned char data_length) {
+bool Herkulex::read_mem(char mem, char servo_id, char reg_addr, unsigned char data_length) {
 	delete(packet);
 	packet = (Packet*)new IoPacket();
 	packet->setPid(servo_id);
@@ -172,6 +174,7 @@ void Herkulex::read_mem(char mem, char servo_id, char reg_addr, unsigned char da
 	p->setDataLength(data_length);
 	p->setStatus(1);
 	send();
+	return receive(11+data_length);
 }
 
 
@@ -186,12 +189,12 @@ void Herkulex::sJog(char size, char servo_id, uint16_t idata, char stop, char mo
 	p->setData(idata);
 	p->setStop(stop);
 	p->setMode(mode);
-	printf("Led(sjog)=%d\n",led);
+//	printf("Led(sjog)=%d\n",led);
 	p->setLed(led);
 	p->setPid(servo_id);
 	p->setId(servo_id);
 	p->setPlayTime(ptime);
-	printf("sJog sent\n");
+//	printf("sJog sent\n");
 //	p->serialize();
 	send();
 }
@@ -370,7 +373,7 @@ void Herkulex::configAckPolicy(char servo_id, char policy) {
  *         1 - led blinks on error
  *         led control will not work with status_error=true
  */
-void Herkulex::configLedPolicy(char policy) {
+void Herkulex::configLedPolicy(char servo_id, char policy) {
 	char *data = (char*)malloc(sizeof(char));
 	data[0]=policy;
 	write_mem(RAM,servo_id,REG_ACK_POLICY,1,data);
@@ -378,17 +381,14 @@ void Herkulex::configLedPolicy(char policy) {
 }
 
 //use constants LED_GREEN, LED_BLUE and LED_RED
-void Herkulex::ledControl(char led) {
+void Herkulex::ledControl(char servo_id, char led) {
 	char *data = (char*)malloc(sizeof(char));
 	data[0]=led;
 	write_mem(RAM,servo_id,REG_LED_CONTROL,1,data);
 	free(data);
 }
 
-/* 0x00 - Free
- * 0x40 - Torque on
- * 0x60 - Break.
- */	 
+// Use: TORQUE_ON, TORQUE_FREE and TORQUE_BREAK constants	 
 void Herkulex::setTorqueControl(char servo_id, char control) {
 	char *data = (char*)malloc(sizeof(char));
 	*data=control;
@@ -396,25 +396,70 @@ void Herkulex::setTorqueControl(char servo_id, char control) {
 	free(data);
 }
 
+float Herkulex::readPosition() {
+	if (read_mem(RAM,servo_id,REG_ABSOLUTE_POS,2)) {
+		ack->print();
+	} else {
+		printf("ack not received\n\n");
+		return -1;
+	}
+	IoPacket *p=(IoPacket*)ack;
+	char* data = p->getData();
+	int16_t rawValue;
+//	uint16_t aux=data[1];
+//	aux=aux<<8;
+//	rawValue=aux<<8;
+//	rawValue&=0xFF00;
+//	rawValue=rawValue|data[0];
 
+	rawValue=((data[1]&0x03)<<8) | data[0];
+	//rawValue-=512;
 
-
-/* mode:
- * 0 - position mode
- * 1 - continuous rotation mode
- * led:
- * 0 - no led lighted
- * 0x01 - green
- * 0x02 - blue
- * 0x04 - red
- */
-void Herkulex::setMode(char mode, char led) {
-//	packet->sJog(0x2000,1,1,0,this->servo_id);
-//	packet->serializeSjog();
+	return ((float)rawValue)*0.325;
 }
 
-void Herkulex::setTorque(char servo_id, uint16_t pwm) {
-	sJog(12,servo_id,pwm,0,1,LED_BLUE,0);
+float Herkulex::readVelocity() {
+	if (read_mem(RAM,servo_id,REG_DIFFERENTIAL_POS,2)) {
+		ack->print();
+	} else {
+		printf("ack not received\n\n");
+		return -1;
+	}
+	IoPacket *p=(IoPacket*)ack;
+	char* data = p->getData();
+	int16_t rawValue = 0;
+//	uint16_t aux=data[1];
+//	aux=aux<<8;
+//	rawValue=aux<<8;
+//	rawValue&=0xFF00;
+//	rawValue=rawValue|data[0];
+	rawValue = ((data[1]&0xFF)<<8) | data[0];
+	return ((float)rawValue)*0.325*PI/(0.0112*180);
+}
+
+
+
+
+void Herkulex::setTorque(int16_t pwm) {
+	uint8_t led = LED_RED;
+	char sign = 0;
+	if (pwm == 0) {
+		led=LED_BLUE;
+		setTorqueControl(servo_id,TORQUE_BREAK);
+		torque_status=TORQUE_BREAK;
+		ledControl(servo_id,led);
+	} else {
+		if (pwm<0) {
+			pwm=pwm*-1;
+			sign=1;
+		}
+		if (pwm>8191) pwm=8191;
+		if (torque_status!=TORQUE_ON) {
+			setTorqueControl(servo_id,TORQUE_ON);	
+		}
+		pwm|=sign<<14;
+		sJog(12,servo_id,pwm,0,1,led,0);
+	}
 }
 
 void Herkulex::send() {
@@ -427,8 +472,8 @@ void Herkulex::send() {
 		printf("\n\nError on serializing buffer\n");
 		return;
 	}
-	printf("\n\nPackage sent:\n");
-	packet->print();
+//	printf("\n\nPackage sent:\n");
+//	packet->print();
 	if (buffer==NULL) printf("serialize fail");
 	switch(serialPort) {
 #if defined (__AVR_ATmega328P__)
@@ -478,10 +523,7 @@ bool  Herkulex::receive(uint8_t size) {
 #else
     n=Serial1.available();
 #endif
-		Serial.print("Bytes available: ");
-		Serial.println(n);
-		Serial.print("Timeout counter: ");
-		Serial.println(Time_Counter);
+		//printf("Bytes available: %d\n Timeout Counter: %d\n\n",n,Time_Counter);
 #if defined (__AVR_ATmega328P__)
 		while (mySerial.available() > 0) {
 			byte inchar = (byte)mySerial.read();
@@ -514,7 +556,7 @@ bool  Herkulex::receive(uint8_t size) {
 		  delay(1);
 	  }
 	  n=Serial2.available();
-	  printf("Bytes available: %d\n Timeout Counter: %d",n,Time_Counter);
+	  printf("Bytes available: %d\n Timeout Counter: %d\n\n",n,Time_Counter);
 	  while (Serial2.available() > 0) {
 		  char inchar = (char)Serial2.read();
 		  if ( (inchar == 0xFF) & ((char)Serial2.peek() == 0xFF) ) {

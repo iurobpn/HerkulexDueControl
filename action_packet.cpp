@@ -54,7 +54,7 @@ void ActionPacket::setLed(uint8_t led) {
 	} else {
 		this->led=0;
 	}
-	printf("Led(setLed)=%d\n",this->led);
+//	printf("Led(setLed)=%d\n",this->led);
 }
 
 void ActionPacket::setInvalid(uint8_t inavlid) {
