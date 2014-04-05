@@ -7,12 +7,15 @@
 #ifndef HERKULEX_H
 #define HERKULEX_H
 
+
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include "Arduino.h"
 #include "io_packet.h"
 #include "action_packet.h"
+
 
 
 #if defined(__AVR_ATmega328P__)
@@ -25,8 +28,8 @@
 #define SERIAL4 3
 #define KV 0.325*PI/(0.0112*180)
 
-#define TIME_OUT 1000
-
+#define TIME_OUT 10
+#define INTER_PKG_TIME 0.000105
 
 class Herkulex {
 private:
@@ -66,6 +69,7 @@ public:
 	void clear();
 	void setTorqueControl(char servo_id, char control);
 	bool scanServo();
+	void setBaudRate(char data);
 
 	/** Control Interface
 	 *

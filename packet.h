@@ -80,6 +80,8 @@
 #define ACK_ROLLBACK 0x48
 #define ACK_REBOOT 0x49
 
+#define EEP_BAUD_RATE 0x04
+
 #define RAM 0
 #define EEP 1
 #define TORQUE_ON 0x60

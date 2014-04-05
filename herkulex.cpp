@@ -82,24 +82,21 @@ void Herkulex::init() {
 	setTorqueControl(servo_id,TORQUE_FREE);//torque free
 	
 	//set tick=11.2ms
-	//printf("Torque Control Ok\n");
 	data[0]=1;
 	//only reply to read commands
 	configAckPolicy(servo_id,1);
-	//printf("Ack Policy ok\n");
 	/*	
 	write_mem(RAM,servo_id,REG_TICK,1,data);//clock=11.2ms
 	//printf("Clock ok\n");
 	*/
+
 	//set no acceleration time
 	data[0]=0;
 	write_mem(RAM,servo_id,REG_MAX_ACC_TIME,1,data);
-	//printf("ACC time ok\n");
-
+	
 	data[0]=0; 
 	write_mem(RAM,servo_id,REG_PWM_OFFSET,1,data);
-	//printf("PWM Offset ok\n");	
-
+	
 	//min pwm = 0
 	data[0]=0;	
 	write_mem(RAM,servo_id,REG_MIN_PWM,1,data);
@@ -109,34 +106,21 @@ void Herkulex::init() {
 	data[1]=0x03;//little endian 0x03FF sent
 	data[0]=0xFF;
 	write_mem(RAM,servo_id,REG_MAX_PWM,2,data);
-	//printf("Max PWM ok\n");
 	
+//Acceleration Ratio = MAX
 	data[0]=0xFF;
 	write_mem(RAM,servo_id,REG_ACC_RATIO,1,data);
-	//printf("Acc ratio ok\n");
 	
 	//0x7FFE max. overload pwm
 	data[1]=0xFE;//little endian
 	data[0]=0x7F;
 	write_mem(RAM,servo_id,REG_MAX_PWM,2,data);
-//	printf("PWM Overload ok\n");
 	
 	setTorqueControl(servo_id,TORQUE_ON);//torque on
-//	printf("Torque On Ok\n");
-/*
-	//this->flush();
-	setTorque(servo_id,704);
-
-	printf("stat()\n");
-	if (stat()) {
-		printf("Ack received\n");
-		ack->print();
-	} else {
-		printf("Ack not received\n");
-	}
-*/
-	//setMode(1);
-	//moveCont(200);
+}
+//set the servo baud-rate 0x04 is 400Mbps, 0x10 is default(115200)
+void Herkulex::setBaudRate(char data) {
+	write_mem(EEP,this->servo_id,EEP_BAUD_RATE,1,&data);
 }
 
 void Herkulex::write_mem(char mem, char servo_id, char reg_addr, unsigned char data_length, char *data) {
@@ -179,7 +163,7 @@ bool Herkulex::read_mem(char mem, char servo_id, char reg_addr, unsigned char da
 
 
 
-
+//send a sjog command to one servo
 void Herkulex::sJog(char size, char servo_id, uint16_t idata, char stop, char mode, char led, char ptime) {
 	delete(packet);
 	packet = (Packet*)new ActionPacket();
@@ -189,13 +173,10 @@ void Herkulex::sJog(char size, char servo_id, uint16_t idata, char stop, char mo
 	p->setData(idata);
 	p->setStop(stop);
 	p->setMode(mode);
-//	printf("Led(sjog)=%d\n",led);
 	p->setLed(led);
 	p->setPid(servo_id);
 	p->setId(servo_id);
 	p->setPlayTime(ptime);
-//	printf("sJog sent\n");
-//	p->serialize();
 	send();
 }
 
@@ -203,6 +184,8 @@ void Herkulex::iJog() {
 	
 }
 
+
+//send a stat comand, receive ack and decode the error sending to Serial0 port
 bool Herkulex::stat() {
 	packet = (Packet*)new IoPacket();
 	packet->setPid(servo_id);
@@ -220,6 +203,7 @@ bool Herkulex::stat() {
 	return out;
 }
 
+//decode the error, printing the result in serial0 port.
 void Herkulex::decodeError(char *error) {
 	char *string;
 	switch(error[0]) {
@@ -271,6 +255,7 @@ void Herkulex::decodeError(char *error) {
 	}
 }
 
+//scan for conected servos.
 bool Herkulex::scanServo() {
 	unsigned char pid;
 	for(unsigned char i=0;i<254;i++) {
@@ -287,6 +272,8 @@ bool Herkulex::scanServo() {
 	return false;
 }
 
+
+//Flush the serial buffer, not working, not very well tested.
 void Herkulex::flush() {
 	delay(1);
 	char *garbage;
@@ -334,10 +321,12 @@ void Herkulex::flush() {
 	}
 }
 
+//Return to default configurations, except to baudrate
 void Herkulex::rollback() {
 	
 }
 
+//reboot the servo - tested
 void Herkulex::reboot() {
 	delete(packet);
 	packet = (Packet*)new IoPacket();
@@ -350,6 +339,7 @@ void Herkulex::reboot() {
 }
 
 
+//clear the servo errors - tested
 void Herkulex::clear() {
 	char *data = (char*)malloc(2*sizeof(char));
 	data[0]=0;
@@ -361,6 +351,7 @@ void Herkulex::clear() {
 /* policy: 0 - no reply;
  *         1 - only reply to read commands
  *         2 - reply to all commands
+ * not tested
  */
 void Herkulex::configAckPolicy(char servo_id, char policy) {
 	char *data = (char*)malloc(sizeof(char));
@@ -372,6 +363,7 @@ void Herkulex::configAckPolicy(char servo_id, char policy) {
 /* policy: 0 - no blinking
  *         1 - led blinks on error
  *         led control will not work with status_error=true
+ * not tested
  */
 void Herkulex::configLedPolicy(char servo_id, char policy) {
 	char *data = (char*)malloc(sizeof(char));
@@ -381,6 +373,7 @@ void Herkulex::configLedPolicy(char servo_id, char policy) {
 }
 
 //use constants LED_GREEN, LED_BLUE and LED_RED
+// not tested
 void Herkulex::ledControl(char servo_id, char led) {
 	char *data = (char*)malloc(sizeof(char));
 	data[0]=led;
@@ -388,7 +381,10 @@ void Herkulex::ledControl(char servo_id, char led) {
 	free(data);
 }
 
-// Use: TORQUE_ON, TORQUE_FREE and TORQUE_BREAK constants	 
+/** set the torque control mode
+ * Use: TORQUE_ON, TORQUE_FREE and TORQUE_BREAK constants
+ * tested
+ */ 
 void Herkulex::setTorqueControl(char servo_id, char control) {
 	char *data = (char*)malloc(sizeof(char));
 	*data=control;
@@ -396,9 +392,11 @@ void Herkulex::setTorqueControl(char servo_id, char control) {
 	free(data);
 }
 
+//Read the current position in degrees.
+//tested
 float Herkulex::readPosition() {
 	if (read_mem(RAM,servo_id,REG_ABSOLUTE_POS,2)) {
-		ack->print();
+		//ack->print();
 	} else {
 		printf("ack not received\n\n");
 		return -1;
@@ -406,21 +404,16 @@ float Herkulex::readPosition() {
 	IoPacket *p=(IoPacket*)ack;
 	char* data = p->getData();
 	int16_t rawValue;
-//	uint16_t aux=data[1];
-//	aux=aux<<8;
-//	rawValue=aux<<8;
-//	rawValue&=0xFF00;
-//	rawValue=rawValue|data[0];
-
 	rawValue=((data[1]&0x03)<<8) | data[0];
-	//rawValue-=512;
 
 	return ((float)rawValue)*0.325;
 }
 
+//read the current angular velocity in rad/s
+//tested
 float Herkulex::readVelocity() {
 	if (read_mem(RAM,servo_id,REG_DIFFERENTIAL_POS,2)) {
-		ack->print();
+		//ack->print();
 	} else {
 		printf("ack not received\n\n");
 		return -1;
@@ -428,18 +421,14 @@ float Herkulex::readVelocity() {
 	IoPacket *p=(IoPacket*)ack;
 	char* data = p->getData();
 	int16_t rawValue = 0;
-//	uint16_t aux=data[1];
-//	aux=aux<<8;
-//	rawValue=aux<<8;
-//	rawValue&=0xFF00;
-//	rawValue=rawValue|data[0];
 	rawValue = ((data[1]&0xFF)<<8) | data[0];
+
 	return ((float)rawValue)*0.325*PI/(0.0112*180);
 }
 
-
-
-
+/** set the PWM to the servomotor
+ * tested
+ */
 void Herkulex::setTorque(int16_t pwm) {
 	uint8_t led = LED_RED;
 	char sign = 0;
@@ -462,11 +451,9 @@ void Herkulex::setTorque(int16_t pwm) {
 	}
 }
 
+//send package to servo
+//tested
 void Herkulex::send() {
-//	if (package_type == ACTION_PACKET) {
-//		IoPacket *p = (IoPacket*)packet;
-//	}
-
 	char *buffer = packet->serialize();
 	if (buffer==NULL) {
 		printf("\n\nError on serializing buffer\n");
@@ -494,8 +481,7 @@ void Herkulex::send() {
 	}
 }
 
-
-
+//receive packet from servo, tested
 bool  Herkulex::receive(uint8_t size) {
 	uint8_t counter = 0, n = 0;
 	int i = 0;
@@ -603,6 +589,7 @@ bool  Herkulex::receive(uint8_t size) {
   }
 }
 
+//Print the ack packet
 void Herkulex::printAck() {
 	if (ack==NULL) {
 		Serial.println("No ack packet present.");
