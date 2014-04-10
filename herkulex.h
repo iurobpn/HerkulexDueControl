@@ -69,7 +69,7 @@ public:
 	void clear();
 	void setTorqueControl(char servo_id, char control);
 	bool scanServo();
-	void setBaudRate(char data);
+	void writeBaudRateOnServo(char baudrate);
 
 	/** Control Interface
 	 *

@@ -72,16 +72,13 @@ void Herkulex::end() {
 void Herkulex::init() {
 	clear();
 	delay(12);
-//	printf("Servo cleared\n");
 	reboot();
-//	printf("Servo rebooted\n");
 	delay(1000);
 
 	char *data = (char*)malloc(2*sizeof(char));
 
 	setTorqueControl(servo_id,TORQUE_FREE);//torque free
 	
-	//set tick=11.2ms
 	data[0]=1;
 	//only reply to read commands
 	configAckPolicy(servo_id,1);
@@ -100,7 +97,6 @@ void Herkulex::init() {
 	//min pwm = 0
 	data[0]=0;	
 	write_mem(RAM,servo_id,REG_MIN_PWM,1,data);
-	//printf("Min PWM ok\n");
 
 	//max pwm >1023 -> no max pwm
 	data[1]=0x03;//little endian 0x03FF sent
@@ -118,9 +114,36 @@ void Herkulex::init() {
 	
 	setTorqueControl(servo_id,TORQUE_ON);//torque on
 }
+
 //set the servo baud-rate 0x04 is 400Mbps, 0x10 is default(115200)
-void Herkulex::setBaudRate(char data) {
-	write_mem(EEP,this->servo_id,EEP_BAUD_RATE,1,&data);
+void Herkulex::writeBaudRateOnServo(char baudrate) {
+	char br = 0x00;
+	switch(baudrate) {
+	case 666666:
+		br=0x02;
+		break;
+	case 500000:
+		br=0x03;
+		break;
+	case 400000:
+		br=0x04;
+		break;
+	case 250000:
+		br=0x07;
+		break;
+	case 200000:
+		br=0x09;
+		break;
+	case 115200:
+		br=0x10;
+		break;
+	case 57600:
+		br=0x22;
+		break;
+	default:
+		return;
+	}
+	write_mem(EEP,this->servo_id,EEP_BAUD_RATE,1,&br);
 }
 
 void Herkulex::write_mem(char mem, char servo_id, char reg_addr, unsigned char data_length, char *data) {
