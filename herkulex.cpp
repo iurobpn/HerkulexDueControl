@@ -455,10 +455,11 @@ float Herkulex::readVelocity() {
 void Herkulex::setTorque(int16_t pwm) {
 	uint8_t led = LED_RED;
 	char sign = 0;
+
 	if (pwm == 0) {
 		led=LED_BLUE;
-		setTorqueControl(servo_id,TORQUE_BREAK);
-		torque_status=TORQUE_BREAK;
+		//setTorqueControl(servo_id,TORQUE_BREAK);
+		//torque_status=TORQUE_BREAK;
 		ledControl(servo_id,led);
 	} else {
 		if (pwm<0) {
