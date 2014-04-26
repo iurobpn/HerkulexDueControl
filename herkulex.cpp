@@ -5,7 +5,7 @@
 Herkulex::Herkulex() {
 	ack=NULL;
 	packet=NULL;
-	serialPort=SERIAL1;
+	serialPort=SERIAL3;
 	servo_id=253;
 	torque_status=0;
 #ifdef __AVR_ATmega328P__
@@ -475,7 +475,7 @@ void Herkulex::setTorque(int16_t pwm) {
 }
 
 //send package to servo
-//tested
+//tested				
 void Herkulex::send() {
 	char *buffer = packet->serialize();
 	if (buffer==NULL) {
@@ -564,8 +564,8 @@ bool  Herkulex::receive(uint8_t size) {
 		  Time_Counter++;
 		  delay(1);
 	  }
-	  n=Serial2.available();
-	  printf("Bytes available: %d\n Timeout Counter: %d\n\n",n,Time_Counter);
+	  //n=Serial2.available();
+	  //printf("Bytes available: %d\n Timeout Counter: %d\n\n",n,Time_Counter);
 	  while (Serial2.available() > 0) {
 		  char inchar = (char)Serial2.read();
 		  if ( (inchar == 0xFF) & ((char)Serial2.peek() == 0xFF) ) {
@@ -587,17 +587,17 @@ bool  Herkulex::receive(uint8_t size) {
   case SERIAL3:
 	  while((Serial3.available() < size) & (Time_Counter < TIME_OUT)) {
 		  Time_Counter++;
-		  delay(1);
+			delay_micros(10);//delayMicroseconds(10);
 	  }
-	  n=Serial3.available();
-	  printf("Bytes available: %d\n Timeout Counter: %d",n,Time_Counter);
+	  //n=Serial3.available();
+	  //printf("Bytes available: %d\n Timeout Counter: %d\n",n,Time_Counter);
 	  while (Serial3.available() > 0) {
 		  char inchar = (char)Serial3.read();
 		  if ( (inchar == 0xFF) & ((char)Serial3.peek() == 0xFF) ) {
 			  beginsave=1;
 			  i=0;
 		  }
-		  if (beginsave==1 && i<size) {
+		  if (beginsave && i<size) {
 			  buffer[i] = inchar;
 			  i++;
 		  }
